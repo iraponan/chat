@@ -1,5 +1,6 @@
-import 'package:chat/components/text_composer.dart';
+import 'package:chat/widgets/text_composer.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -15,10 +16,14 @@ class _ChatPageState extends State<ChatPage> {
       appBar: AppBar(
         title: const Text('Olá'),
         elevation: 0,
-        // backgroundColor: Colors.blue,
-        // foregroundColor: Colors.white,
       ),
-      body: const TextComposer(),
+      body: TextComposer(sendMessage: _sendMessager),
     );
+  }
+
+  void _sendMessager(String text) {
+    FirebaseFirestore.instance.collection('messages').add({
+      'text' : text
+    });
   }
 }
