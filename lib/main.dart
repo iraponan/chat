@@ -4,10 +4,11 @@ import 'package:flutter/material.dart';
 import 'firebase_options.dart';
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  FirebaseFirestore.instance.collection('col').doc('doc').set({'texto' : 'iraponan'});
+  await FirebaseFirestore.instance.collection('col').doc('doc').set({'texto' : 'iraponan'});
   runApp(const MyApp());
 }
 
