@@ -13,6 +13,8 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
+  final String _colletion = 'messages';
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -20,7 +22,37 @@ class _ChatPageState extends State<ChatPage> {
         title: const Text('Olá'),
         elevation: 0,
       ),
-      body: TextComposer(sendMessage: _sendMessager),
+      body: Column(
+        children: [
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream:
+                  FirebaseFirestore.instance.collection(_colletion).snapshots(),
+              builder: (context, snapshot) {
+                switch (snapshot.connectionState) {
+                  case ConnectionState.none:
+                  case ConnectionState.waiting:
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  default:
+                    List<DocumentSnapshot> docs = snapshot.data!.docs.reversed.toList();
+                    return ListView.builder(
+                      itemCount: docs.length,
+                      reverse: true,
+                      itemBuilder: (context, index) {
+                        return ListTile(
+                          title: Text(docs[index].get('text')),
+                        );
+                      },
+                    );
+                }
+              },
+            ),
+          ),
+          TextComposer(sendMessage: _sendMessager),
+        ],
+      ),
     );
   }
 
@@ -43,6 +75,6 @@ class _ChatPageState extends State<ChatPage> {
       data['text'] = text;
     }
 
-    FirebaseFirestore.instance.collection('messages').add(data);
+    FirebaseFirestore.instance.collection(_colletion).add(data);
   }
 }
