@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:chat/widgets/chat_message.dart';
 import 'package:chat/widgets/text_composer.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -45,13 +46,14 @@ class _ChatPageState extends State<ChatPage> {
                     );
                   default:
                     List<DocumentSnapshot>? docs =
-                        snapshot.data?.docs.reversed.toList();
+                        snapshot.data!.docs.reversed.toList();
                     return ListView.builder(
-                      itemCount: docs?.length ?? 0,
+                      itemCount: docs.length ?? 0,
                       reverse: true,
                       itemBuilder: (context, index) {
-                        return ListTile(
-                          title: Text(docs?[index].get('text')),
+                        return ChatMessage(
+                          data: docs[index].data() as Map<String, dynamic>,
+                          mine: true,
                         );
                       },
                     );
@@ -77,9 +79,9 @@ class _ChatPageState extends State<ChatPage> {
       ));
     } else {
       data = {
-        'uid' : user.uid,
-        'senderName' : user.displayName,
-        'senderPhotoUrl' : user.photoURL,
+        'uid': user.uid,
+        'senderName': user.displayName,
+        'senderPhotoUrl': user.photoURL,
       };
     }
 
