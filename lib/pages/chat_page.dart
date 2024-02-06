@@ -40,11 +40,11 @@ class _ChatPageState extends State<ChatPage> {
                   onPressed: () {
                     FirebaseAuth.instance.signOut();
                     googleSignIn.signOut();
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    _scaffoldKey.currentState?.showSnackBar(const SnackBar(
                       content: Text('Você Saiu Com Sucesso!!!.'),
                     ));
                   },
-                  icon: Icon(Icons.exit_to_app),
+                  icon: const Icon(Icons.exit_to_app),
                 )
               : Container(),
         ],
@@ -81,7 +81,7 @@ class _ChatPageState extends State<ChatPage> {
               },
             ),
           ),
-          _isLoading ? LinearProgressIndicator() : Container(),
+          _isLoading ? const LinearProgressIndicator() : Container(),
           TextComposer(sendMessage: _sendMessage),
         ],
       ),
@@ -92,24 +92,28 @@ class _ChatPageState extends State<ChatPage> {
     final User? user = await _getUser();
 
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Não foi possível fazer o login. Tente novamente.'),
+      _scaffoldKey.currentState?.showSnackBar(const SnackBar(
+        content: Text('Não foi possível fazer o login! Tente novamente.'),
         backgroundColor: Colors.red,
       ));
     }
 
     Map<String, dynamic> data = {
-      'uid': user!.uid,
-      'senderName': user.displayName,
-      'senderPhotoUrl': user.photoURL,
-      'time': Timestamp.now()
+      'uid' : user!.uid,
+      'senderName' : user.displayName,
+      'senderPhotoUrl' : user.photoURL,
+      'time' : Timestamp.now()
     };
 
     if (imgFile != null) {
+      SettableMetadata metadata = SettableMetadata(
+        contentType: "image/jpeg",
+      );
       UploadTask task = FirebaseStorage.instance
           .ref()
+          .child(user.uid)
           .child(DateTime.now().millisecondsSinceEpoch.toString())
-          .putFile(imgFile);
+          .putFile(imgFile, metadata);
 
       setState(() {
         _isLoading = true;
