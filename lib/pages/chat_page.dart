@@ -22,21 +22,41 @@ class _ChatPageState extends State<ChatPage> {
       GlobalKey<ScaffoldMessengerState>();
 
   User? _currentUser;
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
       appBar: AppBar(
-        title: const Text('Olá'),
+        title: Text(_currentUser != null
+            ? 'Olá, ${_currentUser!.displayName}'
+            : 'Chat App'),
+        centerTitle: true,
         elevation: 0,
+        actions: [
+          _currentUser != null
+              ? IconButton(
+                  onPressed: () {
+                    FirebaseAuth.instance.signOut();
+                    googleSignIn.signOut();
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('Você Saiu Com Sucesso!!!.'),
+                    ));
+                  },
+                  icon: Icon(Icons.exit_to_app),
+                )
+              : Container(),
+        ],
       ),
       body: Column(
         children: [
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream:
-                  FirebaseFirestore.instance.collection(_colletion).snapshots(),
+              stream: FirebaseFirestore.instance
+                  .collection(_colletion)
+                  .orderBy('time')
+                  .snapshots(),
               builder: (context, snapshot) {
                 switch (snapshot.connectionState) {
                   case ConnectionState.none:
@@ -46,14 +66,14 @@ class _ChatPageState extends State<ChatPage> {
                     );
                   default:
                     List<DocumentSnapshot>? docs =
-                        snapshot.data!.docs.reversed.toList();
+                        snapshot.data?.docs.reversed.toList();
                     return ListView.builder(
-                      itemCount: docs.length ?? 0,
+                      itemCount: docs?.length ?? 0,
                       reverse: true,
                       itemBuilder: (context, index) {
                         return ChatMessage(
-                          data: docs[index].data() as Map<String, dynamic>,
-                          mine: true,
+                          data: docs?[index].data() as Map<String, dynamic>,
+                          mine: docs?[index].get('uid') == _currentUser?.uid,
                         );
                       },
                     );
@@ -61,77 +81,91 @@ class _ChatPageState extends State<ChatPage> {
               },
             ),
           ),
-          TextComposer(sendMessage: _sendMessager),
+          _isLoading ? LinearProgressIndicator() : Container(),
+          TextComposer(sendMessage: _sendMessage),
         ],
       ),
     );
   }
 
-  void _sendMessager({String? text, File? imgFile}) async {
-    final User? user = await _getUsers();
-    print('Usuario: $user');
-    Map<String, dynamic> data = {};
+  Future<void> _sendMessage({String? text, File? imgFile}) async {
+    final User? user = await _getUser();
 
     if (user == null) {
-      _scaffoldKey.currentState?.showSnackBar(const SnackBar(
-        content: Text('Não foi possível fazer o login! Tente novamente.'),
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Não foi possível fazer o login. Tente novamente.'),
         backgroundColor: Colors.red,
       ));
-    } else {
-      data = {
-        'uid': user.uid,
-        'senderName': user.displayName,
-        'senderPhotoUrl': user.photoURL,
-      };
     }
 
+    Map<String, dynamic> data = {
+      'uid': user!.uid,
+      'senderName': user.displayName,
+      'senderPhotoUrl': user.photoURL,
+      'time': Timestamp.now()
+    };
+
     if (imgFile != null) {
-      SettableMetadata metadata = SettableMetadata(
-        contentType: "image/jpeg",
-      );
-      TaskSnapshot task = await FirebaseStorage.instance
+      UploadTask task = FirebaseStorage.instance
           .ref()
-          .child(DateTime.now().microsecondsSinceEpoch.toString())
-          .putFile(imgFile, metadata);
-      String urlImage = await task.ref.getDownloadURL();
-      data['imgUrl'] = urlImage;
+          .child(DateTime.now().millisecondsSinceEpoch.toString())
+          .putFile(imgFile);
+
+      setState(() {
+        _isLoading = true;
+      });
+
+      TaskSnapshot taskSnapshot = await task;
+      String url = await taskSnapshot.ref.getDownloadURL();
+      data['imgUrl'] = url;
+
+      setState(() {
+        _isLoading = false;
+      });
     }
 
     if (text != null) {
       data['text'] = text;
     }
-
-    FirebaseFirestore.instance.collection(_colletion).add(data);
+    setState(() {
+      FirebaseFirestore.instance.collection(_colletion).add(data);
+    });
   }
 
-  Future<User?> _getUsers() async {
-    if (_currentUser != null) {
-      return _currentUser;
-    }
+  Future<User?> _getUser() async {
+    if (_currentUser != null) return _currentUser;
+
+    FirebaseAuth auth = FirebaseAuth.instance;
+    User? user;
 
     try {
       final GoogleSignInAccount? googleSignInAccount =
           await googleSignIn.signIn();
-      final GoogleSignInAuthentication? googleSignInAuthentication =
-          await googleSignInAccount?.authentication;
+
+      final GoogleSignInAuthentication googleSignInAuthentication =
+          await googleSignInAccount!.authentication;
+
       final AuthCredential credential = GoogleAuthProvider.credential(
-          idToken: googleSignInAuthentication?.idToken,
-          accessToken: googleSignInAuthentication?.accessToken);
+          idToken: googleSignInAuthentication.idToken,
+          accessToken: googleSignInAuthentication.accessToken);
+
       final UserCredential userCredential =
-          await FirebaseAuth.instance.signInWithCredential(credential);
-      final User? user = userCredential.user;
+          await auth.signInWithCredential(credential);
+
+      user = userCredential.user;
       return user;
     } catch (error) {
-      print('Erro de Login = $error}');
+      return null;
     }
-    return null;
   }
 
   @override
   void initState() {
     super.initState();
-    FirebaseAuth.instance.authStateChanges().map((user) {
-      _currentUser = user!;
+    FirebaseAuth.instance.authStateChanges().listen((user) {
+      setState(() {
+        _currentUser = user;
+      });
     });
   }
 }
